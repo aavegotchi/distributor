@@ -40,6 +40,11 @@ contract MerkleDistributor is Ownable, Pausable, ReentrancyGuard {
         _;
     }
 
+    modifier onlyOwnerOrDAO() {
+        if (msg.sender != owner() && msg.sender != dao) revert OnlyDAO();
+        _;
+    }
+
     constructor(address _dao, address _owner) Ownable(_owner) {
         require(_dao != address(0), "Invalid DAO address");
         dao = _dao;
@@ -78,9 +83,11 @@ contract MerkleDistributor is Ownable, Pausable, ReentrancyGuard {
         emit Claimed(msg.sender, amount);
     }
 
+    /// @notice Withdraws remaining ETH after claim period expires. Can withdraw immediately if paused.
     function withdrawRemaining() external onlyDAO nonReentrant {
         if (claimStartTime == 0) revert ClaimsNotOpened();
-        if (block.timestamp < claimStartTime + CLAIM_PERIOD)
+        // Allow immediate withdrawal if contract is paused (emergency case)
+        if (!paused() && block.timestamp < claimStartTime + CLAIM_PERIOD)
             revert ClaimPeriodNotExpired();
 
         uint256 remaining = address(this).balance;
@@ -91,11 +98,11 @@ contract MerkleDistributor is Ownable, Pausable, ReentrancyGuard {
         emit RemainingWithdrawn(dao, remaining);
     }
 
-    function pause() external onlyOwner {
+    function pause() external onlyOwnerOrDAO {
         _pause();
     }
 
-    function unpause() external onlyOwner {
+    function unpause() external onlyOwnerOrDAO {
         _unpause();
     }
 

@@ -125,10 +125,12 @@ describe("MerkleDistributor", function () {
 
   describe("openClaims", function () {
     it("should allow DAO to open claims with live CSV total", async function () {
-      const tx = await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      const tx = await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
       const receipt = await tx.wait();
       const block = await ethers.provider.getBlock(receipt!.blockNumber);
-      
+
       await expect(tx)
         .to.emit(distributor, "ClaimsOpened")
         .withArgs(merkleRoot, totalAmount, block!.timestamp);
@@ -139,7 +141,9 @@ describe("MerkleDistributor", function () {
 
     it("should revert if called by non-DAO", async function () {
       await expect(
-        distributor.connect(owner).openClaims(merkleRoot, { value: totalAmount })
+        distributor
+          .connect(owner)
+          .openClaims(merkleRoot, { value: totalAmount })
       ).to.be.revertedWithCustomError(distributor, "OnlyDAO");
     });
 
@@ -150,7 +154,9 @@ describe("MerkleDistributor", function () {
     });
 
     it("should revert if called twice", async function () {
-      await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
       await setBalance(dao.address, totalAmount + ethers.parseEther("100"));
       await expect(
         distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount })
@@ -160,15 +166,22 @@ describe("MerkleDistributor", function () {
 
   describe("claim", function () {
     beforeEach(async function () {
-      await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
     });
 
     it("should verify all claims from live CSV", async function () {
       const sampleSize = Math.min(20, claims.length);
       for (let i = 0; i < sampleSize; i++) {
         const claim = claimsWithProof.get(claims[i].address)!;
-        const isValid = await distributor.verifyClaim(claim.address, claim.amount, claim.proof);
-        expect(isValid, `Claim for ${claim.address} should be valid`).to.be.true;
+        const isValid = await distributor.verifyClaim(
+          claim.address,
+          claim.amount,
+          claim.proof
+        );
+        expect(isValid, `Claim for ${claim.address} should be valid`).to.be
+          .true;
       }
     });
 
@@ -180,7 +193,9 @@ describe("MerkleDistributor", function () {
       await setBalance(claim.address, ethers.parseEther("1"));
 
       const balanceBefore = await ethers.provider.getBalance(claim.address);
-      const tx = await distributor.connect(claimant).claim(claim.amount, claim.proof);
+      const tx = await distributor
+        .connect(claimant)
+        .claim(claim.amount, claim.proof);
       const receipt = await tx.wait();
       const gasUsed = receipt!.gasUsed * receipt!.gasPrice;
       const balanceAfter = await ethers.provider.getBalance(claim.address);
@@ -196,7 +211,9 @@ describe("MerkleDistributor", function () {
       const claimant = await ethers.getImpersonatedSigner(claim.address);
       await setBalance(claim.address, ethers.parseEther("1"));
 
-      await expect(distributor.connect(claimant).claim(claim.amount, claim.proof))
+      await expect(
+        distributor.connect(claimant).claim(claim.amount, claim.proof)
+      )
         .to.emit(distributor, "Claimed")
         .withArgs(claim.address, claim.amount);
     });
@@ -210,14 +227,18 @@ describe("MerkleDistributor", function () {
         await setBalance(claim.address, ethers.parseEther("1"));
 
         const balanceBefore = await ethers.provider.getBalance(claim.address);
-        const tx = await distributor.connect(claimant).claim(claim.amount, claim.proof);
+        const tx = await distributor
+          .connect(claimant)
+          .claim(claim.amount, claim.proof);
         const receipt = await tx.wait();
         const gasUsed = receipt!.gasUsed * receipt!.gasPrice;
         const balanceAfter = await ethers.provider.getBalance(claim.address);
 
         expect(balanceAfter - balanceBefore + gasUsed).to.equal(
           claim.amount,
-          `User ${claim.address} should receive exactly ${ethers.formatEther(claim.amount)} ETH`
+          `User ${claim.address} should receive exactly ${ethers.formatEther(
+            claim.amount
+          )} ETH`
         );
         expect(await distributor.claimed(claim.address)).to.be.true;
       }
@@ -308,8 +329,9 @@ describe("MerkleDistributor", function () {
       const claimant = await ethers.getImpersonatedSigner(claim.address);
       await setBalance(claim.address, ethers.parseEther("1"));
 
-      await expect(distributor.connect(claimant).claim(claim.amount, claim.proof)).to.not.be
-        .reverted;
+      await expect(
+        distributor.connect(claimant).claim(claim.amount, claim.proof)
+      ).to.not.be.reverted;
     });
 
     it("should revert when contract is paused", async function () {
@@ -328,7 +350,9 @@ describe("MerkleDistributor", function () {
 
   describe("withdrawRemaining", function () {
     beforeEach(async function () {
-      await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
 
       const [firstClaim] = claims;
       const claim = claimsWithProof.get(firstClaim.address)!;
@@ -340,7 +364,9 @@ describe("MerkleDistributor", function () {
     it("should allow DAO to withdraw remaining after claim period", async function () {
       await time.increase(CLAIM_PERIOD + 1);
 
-      const contractBalance = await ethers.provider.getBalance(await distributor.getAddress());
+      const contractBalance = await ethers.provider.getBalance(
+        await distributor.getAddress()
+      );
       const daoBalanceBefore = await ethers.provider.getBalance(dao.address);
 
       const tx = await distributor.connect(dao).withdrawRemaining();
@@ -348,13 +374,17 @@ describe("MerkleDistributor", function () {
       const gasUsed = receipt!.gasUsed * receipt!.gasPrice;
 
       const daoBalanceAfter = await ethers.provider.getBalance(dao.address);
-      expect(daoBalanceAfter - daoBalanceBefore + gasUsed).to.equal(contractBalance);
+      expect(daoBalanceAfter - daoBalanceBefore + gasUsed).to.equal(
+        contractBalance
+      );
     });
 
     it("should emit RemainingWithdrawn event", async function () {
       await time.increase(CLAIM_PERIOD + 1);
 
-      const remaining = await ethers.provider.getBalance(await distributor.getAddress());
+      const remaining = await ethers.provider.getBalance(
+        await distributor.getAddress()
+      );
       await expect(distributor.connect(dao).withdrawRemaining())
         .to.emit(distributor, "RemainingWithdrawn")
         .withArgs(dao.address, remaining);
@@ -375,13 +405,41 @@ describe("MerkleDistributor", function () {
 
     it("should allow withdraw at exactly claim period end", async function () {
       await time.increase(CLAIM_PERIOD);
-      await expect(distributor.connect(dao).withdrawRemaining()).to.not.be.reverted;
+      await expect(distributor.connect(dao).withdrawRemaining()).to.not.be
+        .reverted;
+    });
+
+    it("should allow withdraw immediately when contract is paused (bypasses 90-day wait)", async function () {
+      // Pause contract before claim period expires
+      await distributor.connect(owner).pause();
+      expect(await distributor.paused()).to.be.true;
+
+      // Verify we're still within the claim period
+      const timeRemaining = await distributor.timeRemaining();
+      expect(timeRemaining).to.be.greaterThan(0n);
+
+      const contractBalance = await ethers.provider.getBalance(
+        await distributor.getAddress()
+      );
+      const daoBalanceBefore = await ethers.provider.getBalance(dao.address);
+
+      // Should be able to withdraw immediately even though claim period hasn't expired
+      const tx = await distributor.connect(dao).withdrawRemaining();
+      const receipt = await tx.wait();
+      const gasUsed = receipt!.gasUsed * receipt!.gasPrice;
+
+      const daoBalanceAfter = await ethers.provider.getBalance(dao.address);
+      expect(daoBalanceAfter - daoBalanceBefore + gasUsed).to.equal(
+        contractBalance
+      );
     });
   });
 
   describe("Emergency Functions", function () {
     beforeEach(async function () {
-      await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
     });
 
     it("should allow owner to pause", async function () {
@@ -395,17 +453,54 @@ describe("MerkleDistributor", function () {
       expect(await distributor.paused()).to.be.false;
     });
 
-    it("should revert if non-owner tries to pause", async function () {
-      await expect(
-        distributor.connect(dao).pause()
-      ).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount");
+    it("should allow DAO to pause", async function () {
+      await distributor.connect(dao).pause();
+      expect(await distributor.paused()).to.be.true;
     });
 
-    it("should revert if non-owner tries to unpause", async function () {
+    it("should allow DAO to unpause", async function () {
+      await distributor.connect(dao).pause();
+      await distributor.connect(dao).unpause();
+      expect(await distributor.paused()).to.be.false;
+    });
+
+    it("should allow owner to unpause after DAO pauses", async function () {
+      await distributor.connect(dao).pause();
+      expect(await distributor.paused()).to.be.true;
+      await distributor.connect(owner).unpause();
+      expect(await distributor.paused()).to.be.false;
+    });
+
+    it("should allow DAO to unpause after owner pauses", async function () {
       await distributor.connect(owner).pause();
+      expect(await distributor.paused()).to.be.true;
+      await distributor.connect(dao).unpause();
+      expect(await distributor.paused()).to.be.false;
+    });
+
+    it("should revert if unauthorized address tries to pause", async function () {
+      const signers = await ethers.getSigners();
+      // Get a signer that's neither owner nor dao (use third signer)
+      const unauthorized = signers[2];
+      expect(unauthorized.address).to.not.equal(owner.address);
+      expect(unauthorized.address).to.not.equal(dao.address);
+
       await expect(
-        distributor.connect(dao).unpause()
-      ).to.be.revertedWithCustomError(distributor, "OwnableUnauthorizedAccount");
+        distributor.connect(unauthorized).pause()
+      ).to.be.revertedWithCustomError(distributor, "OnlyDAO");
+    });
+
+    it("should revert if unauthorized address tries to unpause", async function () {
+      await distributor.connect(owner).pause();
+      const signers = await ethers.getSigners();
+      // Get a signer that's neither owner nor dao (use third signer)
+      const unauthorized = signers[2];
+      expect(unauthorized.address).to.not.equal(owner.address);
+      expect(unauthorized.address).to.not.equal(dao.address);
+
+      await expect(
+        distributor.connect(unauthorized).unpause()
+      ).to.be.revertedWithCustomError(distributor, "OnlyDAO");
     });
 
     it("should allow claims after unpause", async function () {
@@ -417,8 +512,9 @@ describe("MerkleDistributor", function () {
       const claimant = await ethers.getImpersonatedSigner(claim.address);
       await setBalance(claim.address, ethers.parseEther("1"));
 
-      await expect(distributor.connect(claimant).claim(claim.amount, claim.proof)).to.not.be
-        .reverted;
+      await expect(
+        distributor.connect(claimant).claim(claim.amount, claim.proof)
+      ).to.not.be.reverted;
     });
   });
 
@@ -428,24 +524,32 @@ describe("MerkleDistributor", function () {
     });
 
     it("should return true for isClaimPeriodActive after claims opened", async function () {
-      await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
       expect(await distributor.isClaimPeriodActive()).to.be.true;
     });
 
     it("should return false for isClaimPeriodActive after period ends", async function () {
-      await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
       await time.increase(CLAIM_PERIOD + 1);
       expect(await distributor.isClaimPeriodActive()).to.be.false;
     });
 
     it("should return correct timeRemaining", async function () {
-      await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
       const remaining = await distributor.timeRemaining();
       expect(remaining).to.be.closeTo(BigInt(CLAIM_PERIOD), 5n);
     });
 
     it("should return 0 for timeRemaining after period ends", async function () {
-      await distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount });
+      await distributor
+        .connect(dao)
+        .openClaims(merkleRoot, { value: totalAmount });
       await time.increase(CLAIM_PERIOD + 1);
       expect(await distributor.timeRemaining()).to.equal(0n);
     });
