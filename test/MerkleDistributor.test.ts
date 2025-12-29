@@ -101,7 +101,10 @@ describe("MerkleDistributor", function () {
     await setBalance(dao.address, totalAmount + ethers.parseEther("100"));
 
     const Factory = await ethers.getContractFactory("MerkleDistributor");
-    distributor = await Factory.deploy(dao.address, owner.address);
+    distributor = (await Factory.deploy(
+      dao.address,
+      owner.address
+    )) as unknown as MerkleDistributor;
     await distributor.waitForDeployment();
   });
 
@@ -123,11 +126,11 @@ describe("MerkleDistributor", function () {
     });
   });
 
-  describe("openClaims", function () {
+  describe("createDistributor", function () {
     it("should allow DAO to open claims with live CSV total", async function () {
       const tx = await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
       const receipt = await tx.wait();
       const block = await ethers.provider.getBlock(receipt!.blockNumber);
 
@@ -143,23 +146,25 @@ describe("MerkleDistributor", function () {
       await expect(
         distributor
           .connect(owner)
-          .openClaims(merkleRoot, { value: totalAmount })
+          .createDistributor(merkleRoot, { value: totalAmount })
       ).to.be.revertedWithCustomError(distributor, "OnlyDAO");
     });
 
     it("should revert if called with zero ETH", async function () {
       await expect(
-        distributor.connect(dao).openClaims(merkleRoot, { value: 0 })
+        distributor.connect(dao).createDistributor(merkleRoot, { value: 0 })
       ).to.be.revertedWithCustomError(distributor, "InvalidDepositAmount");
     });
 
     it("should revert if called twice", async function () {
       await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
       await setBalance(dao.address, totalAmount + ethers.parseEther("100"));
       await expect(
-        distributor.connect(dao).openClaims(merkleRoot, { value: totalAmount })
+        distributor
+          .connect(dao)
+          .createDistributor(merkleRoot, { value: totalAmount })
       ).to.be.revertedWithCustomError(distributor, "ClaimsAlreadyOpened");
     });
   });
@@ -168,7 +173,7 @@ describe("MerkleDistributor", function () {
     beforeEach(async function () {
       await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
     });
 
     it("should verify all claims from live CSV", async function () {
@@ -246,7 +251,10 @@ describe("MerkleDistributor", function () {
 
     it("should revert if claims not opened yet", async function () {
       const Factory = await ethers.getContractFactory("MerkleDistributor");
-      const newDist = await Factory.deploy(dao.address, owner.address);
+      const newDist = (await Factory.deploy(
+        dao.address,
+        owner.address
+      )) as unknown as MerkleDistributor;
 
       const [firstClaim] = claims;
       const claim = claimsWithProof.get(firstClaim.address)!;
@@ -254,7 +262,10 @@ describe("MerkleDistributor", function () {
       await setBalance(claim.address, ethers.parseEther("1"));
 
       await expect(
-        newDist.connect(claimant).claim(claim.amount, claim.proof)
+        (newDist.connect(claimant) as MerkleDistributor).claim(
+          claim.amount,
+          claim.proof
+        )
       ).to.be.revertedWithCustomError(newDist, "ClaimsNotOpened");
     });
 
@@ -352,7 +363,7 @@ describe("MerkleDistributor", function () {
     beforeEach(async function () {
       await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
 
       const [firstClaim] = claims;
       const claim = claimsWithProof.get(firstClaim.address)!;
@@ -439,7 +450,7 @@ describe("MerkleDistributor", function () {
     beforeEach(async function () {
       await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
     });
 
     it("should allow owner to pause", async function () {
@@ -526,14 +537,14 @@ describe("MerkleDistributor", function () {
     it("should return true for isClaimPeriodActive after claims opened", async function () {
       await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
       expect(await distributor.isClaimPeriodActive()).to.be.true;
     });
 
     it("should return false for isClaimPeriodActive after period ends", async function () {
       await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
       await time.increase(CLAIM_PERIOD + 1);
       expect(await distributor.isClaimPeriodActive()).to.be.false;
     });
@@ -541,7 +552,7 @@ describe("MerkleDistributor", function () {
     it("should return correct timeRemaining", async function () {
       await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
       const remaining = await distributor.timeRemaining();
       expect(remaining).to.be.closeTo(BigInt(CLAIM_PERIOD), 5n);
     });
@@ -549,7 +560,7 @@ describe("MerkleDistributor", function () {
     it("should return 0 for timeRemaining after period ends", async function () {
       await distributor
         .connect(dao)
-        .openClaims(merkleRoot, { value: totalAmount });
+        .createDistributor(merkleRoot, { value: totalAmount });
       await time.increase(CLAIM_PERIOD + 1);
       expect(await distributor.timeRemaining()).to.equal(0n);
     });

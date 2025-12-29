@@ -50,7 +50,7 @@ contract MerkleDistributor is Ownable, Pausable, ReentrancyGuard {
         dao = _dao;
     }
 
-    function openClaims(bytes32 _merkleRoot) external payable onlyDAO {
+    function createDistributor(bytes32 _merkleRoot) external payable onlyDAO {
         if (merkleRoot != bytes32(0)) revert ClaimsAlreadyOpened();
         if (msg.value == 0) revert InvalidDepositAmount();
 
