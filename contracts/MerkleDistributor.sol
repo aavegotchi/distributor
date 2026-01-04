@@ -138,4 +138,8 @@ contract MerkleDistributor is Ownable, Pausable, ReentrancyGuard {
         );
         return MerkleProof.verify(proof, merkleRoot, leaf);
     }
+
+    function hasClaimed(address claimant) external view returns (bool) {
+        return claimed[claimant];
+    }
 }

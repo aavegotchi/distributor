@@ -614,5 +614,38 @@ describe("MerkleDistributor", function () {
       await time.increase(CLAIM_PERIOD + 1);
       expect(await distributor.timeRemaining()).to.equal(0n);
     });
+
+    it("should return false for hasClaimed before user claims", async function () {
+      await distributor
+        .connect(dao)
+        .createDistributor(merkleRoot, { value: totalAmount });
+
+      const [firstClaim] = claims;
+      expect(await distributor.hasClaimed(firstClaim.address)).to.be.false;
+    });
+
+    it("should return true for hasClaimed after user claims", async function () {
+      await distributor
+        .connect(dao)
+        .createDistributor(merkleRoot, { value: totalAmount });
+
+      const [firstClaim] = claims;
+      const claim = claimsWithProof.get(firstClaim.address)!;
+      const claimant = await ethers.getImpersonatedSigner(claim.address);
+      await setBalance(claim.address, ethers.parseEther("1"));
+
+      await distributor.connect(claimant).claim(claim.amount, claim.proof);
+
+      expect(await distributor.hasClaimed(claim.address)).to.be.true;
+    });
+
+    it("should return false for hasClaimed for address not in tree", async function () {
+      await distributor
+        .connect(dao)
+        .createDistributor(merkleRoot, { value: totalAmount });
+
+      // Use owner address which is not in the claims tree
+      expect(await distributor.hasClaimed(owner.address)).to.be.false;
+    });
   });
 });
