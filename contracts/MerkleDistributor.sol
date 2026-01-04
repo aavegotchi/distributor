@@ -10,6 +10,9 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /// @notice Distributes ETH via Merkle proof verification. 90-day claim period.
 contract MerkleDistributor is Ownable, Pausable, ReentrancyGuard {
     uint256 public constant CLAIM_PERIOD = 90 days;
+    uint256 public constant DEPOSIT_AMOUNT = 1036920000000700000000;
+    bytes32 public constant MERKLE_ROOT =
+        0xe07775359b09f65b178a4d87b31a37a0c67b6bdee74fe620edc57b3e7d87208b;
 
     address public immutable dao;
     bytes32 public merkleRoot;
@@ -34,6 +37,8 @@ contract MerkleDistributor is Ownable, Pausable, ReentrancyGuard {
     error ClaimPeriodExpired();
     error ClaimPeriodNotExpired();
     error TransferFailed();
+    error InvalidDaoAddress();
+    error InvalidMerkleRoot();
 
     modifier onlyDAO() {
         if (msg.sender != dao) revert OnlyDAO();
@@ -46,13 +51,17 @@ contract MerkleDistributor is Ownable, Pausable, ReentrancyGuard {
     }
 
     constructor(address _dao, address _owner) Ownable(_owner) {
-        require(_dao != address(0), "Invalid DAO address");
+        if (_dao == address(0)) revert InvalidDaoAddress();
         dao = _dao;
     }
 
     function createDistributor(bytes32 _merkleRoot) external payable onlyDAO {
+        //Sanity check: Prevent DAO from opening claims with an invalid merkle root
+        if (_merkleRoot != MERKLE_ROOT) revert InvalidMerkleRoot();
         if (merkleRoot != bytes32(0)) revert ClaimsAlreadyOpened();
-        if (msg.value == 0) revert InvalidDepositAmount();
+
+        //Sanity check: Prevent DAO from opening claims with an invalid deposit amount
+        if (msg.value != DEPOSIT_AMOUNT) revert InvalidDepositAmount();
 
         merkleRoot = _merkleRoot;
         claimStartTime = block.timestamp;

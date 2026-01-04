@@ -9,6 +9,11 @@ import { time, setBalance } from "@nomicfoundation/hardhat-network-helpers";
 const CSV_URL =
   "https://raw.githubusercontent.com/pgendreau/aavegotchi-ptd/refs/heads/main/TotalDistributionAmounts.csv";
 
+// Must match contract constants
+const EXPECTED_MERKLE_ROOT =
+  "0xe07775359b09f65b178a4d87b31a37a0c67b6bdee74fe620edc57b3e7d87208b";
+const EXPECTED_DEPOSIT_AMOUNT = 1036920000000700000000n;
+
 interface Claim {
   address: string;
   amount: bigint;
@@ -94,6 +99,16 @@ describe("MerkleDistributor", function () {
     const { root, claimsMap } = buildMerkleTree(claims);
     merkleRoot = root;
     claimsWithProof = claimsMap;
+
+    // Sanity check: verify CSV-generated values match contract constants
+    expect(merkleRoot).to.equal(
+      EXPECTED_MERKLE_ROOT,
+      "CSV merkle root must match contract MERKLE_ROOT constant"
+    );
+    expect(totalAmount).to.equal(
+      EXPECTED_DEPOSIT_AMOUNT,
+      "CSV total must match contract DEPOSIT_AMOUNT constant"
+    );
   });
 
   beforeEach(async function () {
@@ -127,7 +142,7 @@ describe("MerkleDistributor", function () {
   });
 
   describe("createDistributor", function () {
-    it("should allow DAO to open claims with live CSV total", async function () {
+    it("should allow DAO to open claims with correct merkle root and amount", async function () {
       const tx = await distributor
         .connect(dao)
         .createDistributor(merkleRoot, { value: totalAmount });
@@ -142,6 +157,13 @@ describe("MerkleDistributor", function () {
       expect(await distributor.totalDistribution()).to.equal(totalAmount);
     });
 
+    it("should have correct constants matching expected values", async function () {
+      expect(await distributor.MERKLE_ROOT()).to.equal(EXPECTED_MERKLE_ROOT);
+      expect(await distributor.DEPOSIT_AMOUNT()).to.equal(
+        EXPECTED_DEPOSIT_AMOUNT
+      );
+    });
+
     it("should revert if called by non-DAO", async function () {
       await expect(
         distributor
@@ -150,9 +172,37 @@ describe("MerkleDistributor", function () {
       ).to.be.revertedWithCustomError(distributor, "OnlyDAO");
     });
 
+    it("should revert if called with wrong merkle root", async function () {
+      const wrongRoot = ethers.keccak256(ethers.toUtf8Bytes("wrong"));
+      await expect(
+        distributor
+          .connect(dao)
+          .createDistributor(wrongRoot, { value: totalAmount })
+      ).to.be.revertedWithCustomError(distributor, "InvalidMerkleRoot");
+    });
+
     it("should revert if called with zero ETH", async function () {
       await expect(
         distributor.connect(dao).createDistributor(merkleRoot, { value: 0 })
+      ).to.be.revertedWithCustomError(distributor, "InvalidDepositAmount");
+    });
+
+    it("should revert if called with wrong deposit amount", async function () {
+      const wrongAmount = totalAmount + 1n;
+      await setBalance(dao.address, wrongAmount + ethers.parseEther("100"));
+      await expect(
+        distributor
+          .connect(dao)
+          .createDistributor(merkleRoot, { value: wrongAmount })
+      ).to.be.revertedWithCustomError(distributor, "InvalidDepositAmount");
+    });
+
+    it("should revert if called with less than required deposit amount", async function () {
+      const lessAmount = totalAmount - 1n;
+      await expect(
+        distributor
+          .connect(dao)
+          .createDistributor(merkleRoot, { value: lessAmount })
       ).to.be.revertedWithCustomError(distributor, "InvalidDepositAmount");
     });
 
